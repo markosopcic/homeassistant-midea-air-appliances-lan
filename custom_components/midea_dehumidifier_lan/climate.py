@@ -31,9 +31,10 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_TEMPERATURE, PRECISION_HALVES, TEMP_CELSIUS
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from custom_components.midea_dehumidifier_lan.appliance_coordinator import (
-    ApplianceEntity,
+    ApplianceEntity, ApplianceUpdateCoordinator,
 )
 from custom_components.midea_dehumidifier_lan.const import (
     ATTR_RUNNING,
@@ -113,8 +114,10 @@ async def async_setup_entry(
     """Sets up air conditioner entites"""
     hub: Hub = hass.data[DOMAIN][config_entry.entry_id]
 
+    options = config_entry.options
+
     async_add_entities(
-        AirConditionerEntity(c) for c in hub.coordinators if c.is_climate()
+        AirConditionerEntity(c, options) for c in hub.coordinators if c.is_climate()
     )
 
 
@@ -125,8 +128,7 @@ class AirConditionerEntity(ApplianceEntity, ClimateEntity):
     _attr_fan_modes = FAN_MODES
     _attr_preset_modes = PRESET_MODES
     _attr_swing_modes = SWING_MODES
-    _attr_max_temp = MAX_TARGET_TEMPERATURE
-    _attr_min_temp = MIN_TARGET_TEMPERATURE
+
     _attr_precision = PRECISION_HALVES
     _attr_temperature_unit = TEMP_CELSIUS
 
@@ -136,6 +138,18 @@ class AirConditionerEntity(ApplianceEntity, ClimateEntity):
         | SUPPORT_SWING_MODE
         | SUPPORT_PRESET_MODE
     )
+
+    def __init__(self, coordinator: ApplianceUpdateCoordinator, options: dict):
+        super().__init__(coordinator)
+        _LOGGER.warning(options.__str__())
+        if "MAX_TARGET_TEMPERATURE" in options:
+            self.__atr_max_temp = float(options["MAX_TARGET_TEMPERATURE"])
+        else:
+            _attr_max_temp = MAX_TARGET_TEMPERATURE
+        if "MIN_TARGET_TEMPERATURE" in options:
+            self.__atr_min_temp = float(options["MIN_TARGET_TEMPERATURE"])
+        else:
+            _attr_min_temp = MIN_TARGET_TEMPERATURE
 
     _name_suffix = ""
     _add_extra_attrs = True
