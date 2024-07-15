@@ -7,6 +7,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from custom_components.midea_dehumidifier_lan.climate import AirConditionerEntity
 from custom_components.midea_dehumidifier_lan.hub import (
     Hub,
 )
@@ -120,7 +121,7 @@ CLIMATE_SWITCHES: Final = [
 
 
 def _is_enabled(
-    coordinator: ApplianceUpdateCoordinator, switch: _MideaSwitchDescriptor
+        coordinator: ApplianceUpdateCoordinator, switch: _MideaSwitchDescriptor
 ) -> bool:
     return is_enabled_by_capabilities(
         coordinator.appliance.state.capabilities, switch.capability
@@ -128,9 +129,9 @@ def _is_enabled(
 
 
 async def async_setup_entry(
-    hass: HomeAssistant,
-    config_entry: ConfigEntry,
-    async_add_entities: AddEntitiesCallback,
+        hass: HomeAssistant,
+        config_entry: ConfigEntry,
+        async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Sets up appliance switches"""
 
@@ -149,6 +150,8 @@ async def async_setup_entry(
             if coord.is_climate() and _is_enabled(coord, switch):
                 switches.append(MideaSwitch(coord, switch))
 
+    switches += [MideaClimateSwitch(c) for c in hub.coordinators if c.is_climate()]
+
     async_add_entities(switches)
 
 
@@ -157,9 +160,9 @@ class MideaSwitch(ApplianceEntity, SwitchEntity):
     """Generic attr based switch"""
 
     def __init__(
-        self,
-        coordinator: ApplianceUpdateCoordinator,
-        descriptor: _MideaSwitchDescriptor,
+            self,
+            coordinator: ApplianceUpdateCoordinator,
+            descriptor: _MideaSwitchDescriptor,
     ) -> None:
         self._switch_descriptor = descriptor
         self._capability_attr = descriptor.capability
@@ -180,3 +183,26 @@ class MideaSwitch(ApplianceEntity, SwitchEntity):
     def turn_off(self, **kwargs) -> None:
         """Turn the entity off."""
         self.apply(self._attribute_name, False)
+
+
+class MideaClimateSwitch(ApplianceEntity, SwitchEntity):
+
+    def __init__(
+            self,
+            coordinator: ApplianceUpdateCoordinator
+    ) -> None:
+        self._capability_attr = "hvac_mode"
+        self._unique_id_prefix = UNIQUE_CLIMATE_PREFIX
+        self._name_suffix = " Turned On"
+        self._attr_icon = "mdi:electric-switch"
+        self._attribute_name = "hvac_mode"
+        super().__init__(coordinator)
+
+    def on_update(self) -> None:
+        self._attr_is_on = getattr(self.appliance.state, "running", None)
+
+    def turn_on(self, **kwargs) -> None:
+        self.apply("running", True)
+
+    def turn_off(self, **kwargs) -> None:
+        self.apply("running", False)
